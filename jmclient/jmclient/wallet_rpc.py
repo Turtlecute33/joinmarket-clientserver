@@ -607,6 +607,13 @@ class JMWalletDaemon(Service):
                 raise NoWalletFound()
             if not self.wallet_name == walletname:
                 raise InvalidRequestFormat()
+            # This is a synchronous operation (no delay is expected),
+            # hence the reference to the CJ_* lock is really just a gate
+            # on performing the action (so simpler to not update the
+            # state, otherwise we would have to revert it correctly in
+            # all error conditions).
+            if not self.coinjoin_state == CJ_NOT_RUNNING:
+                raise ServiceAlreadyStarted()
             try:
                 tx = direct_send(self.services["wallet"],
                         int(payment_info_json["amount_sats"]),
