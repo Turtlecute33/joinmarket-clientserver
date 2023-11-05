@@ -10,6 +10,26 @@ servers:
 - url: https://none
   description: This API is called locally to a jmwalletd instance, acting as server, for each wallet owner, it is not public.
 paths:
+  /token:
+    post:
+      security:
+        - bearerAuth: []
+      summary: The token endpoint is used by the client to obtain an access token using a grant such as refresh token
+      operationId: token
+      description: >
+        Give a refresh token and get back both an access and refresh token.
+        On initially creating, unlocking or recovering a wallet, store both the refresh and access tokens, the latter is valid for only 30 minutes (must be used for any authenticated call) while the former is for 4 hours (can only be used in the refresh request parameters). Use /token endpoint on a regular basis to get new access and refresh tokens, ideally before access token expiration to avoid authentication errors and in any case, before refresh token expiration. The newly issued tokens must be used in subsequent calls since operation invalidates previously issued tokens.
+      responses:
+        '200':
+          $ref: '#/components/responses/Token-200-OK'
+        '400':
+          $ref: '#/components/responses/400-BadRequest'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenRequest'
+        description: token refresh parameters
   /wallet/create:
     post:
       summary: create a new wallet
@@ -30,6 +50,26 @@ paths:
             schema:
               $ref: '#/components/schemas/CreateWalletRequest'
         description: wallet creation parameters
+  /wallet/recover:
+    post:
+      summary: recover a wallet from a seedphrase
+      operationId: recoverwallet
+      description: Give a filename (.jmdat must be included), a wallettype, a seedphrase and a password, create the wallet for the newly persisted wallet file. The wallettype variable must be one of "sw" - segwit native, "sw-legacy" - segwit legacy or "sw-fb" - segwit native with fidelity bonds supported, the last of which is the default. The seedphrase must be a single string with words space-separated, and must conform to BIP39 (else 400 is returned). Note that this operation cannot be performed when a wallet is already loaded (unlocked).
+      responses:
+        '201':
+          $ref: '#/components/responses/Create-201-OK'
+        '400':
+          $ref: '#/components/responses/400-BadRequest'
+        '401':
+          $ref: '#/components/responses/401-Unauthorized'
+        '409':
+          $ref: '#/components/responses/409-AlreadyExists'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecoverWalletRequest'
+        description: wallet recovery parameters
   /wallet/{walletname}/unlock:
     post:
       summary: decrypt an existing wallet
@@ -44,7 +84,7 @@ paths:
             type: string
       responses:
         '200':
-          $ref: "#/components/responses/Unlock-200-OK"
+          $ref: '#/components/responses/Unlock-200-OK'
         '400':
           $ref: '#/components/responses/400-BadRequest'
         '401':
@@ -75,11 +115,9 @@ paths:
             type: string
       responses:
         '200':
-          $ref: "#/components/responses/Lock-200-OK"
+          $ref: '#/components/responses/Lock-200-OK'
         '400':
           $ref: '#/components/responses/400-BadRequest'
-        '401':
-          $ref: '#/components/responses/401-Unauthorized'
   /wallet/{walletname}/display:
     get:
       security:
@@ -96,11 +134,9 @@ paths:
             type: string
       responses:
         '200':
-          $ref: "#/components/responses/Display-200-OK"
+          $ref: '#/components/responses/Display-200-OK'
         '400':
           $ref: '#/components/responses/400-BadRequest'
-        '401':
-          $ref: '#/components/responses/401-Unauthorized'
         '404':
           $ref: '#/components/responses/404-NotFound'
   /session:
@@ -113,11 +149,19 @@ paths:
       description: get whether a wallet is loaded and whether coinjoin/maker are happening. if an auth token is provided, which is optional, it will be validated.
       responses:
         '200':
-          $ref: "#/components/responses/Session-200-OK"
-        '401':
-          $ref: '#/components/responses/401-Unauthorized'
+          $ref: '#/components/responses/Session-200-OK'
         '404':
           $ref: '#/components/responses/404-NotFound'
+  /getinfo:
+    get:
+      security:
+        - {}
+      summary: get info on backend
+      operationId: version
+      description: get information about backend, including the version of Joinmarket running.
+      responses:
+        '200':
+          $ref: '#/components/responses/Getinfo-200-OK'
   /wallet/all:
     get:
       summary: get current available wallets
@@ -125,21 +169,21 @@ paths:
       description: get all wallet filenames in standard location as a list
       responses:
         '200':
-          $ref: "#/components/responses/ListWallets-200-OK"
+          $ref: '#/components/responses/ListWallets-200-OK'
         '404':
           $ref: '#/components/responses/404-NotFound'
   /wallet/yieldgen/report:
     get:
       summary: get latest report on yield generating activity
       operationId: yieldgenreport
-      description: "Get list of coinjoins taken part in as maker (across all wallets).
-      Data returned as list of strings, each one in the same comma separated format as found in yigen-statement.csv.
-      Note that this returns all lines in the file, including the lines that are only present to represent the starting
-      of a bot. Those lines contain the word Connected and can be thus discarded.
-      The header line is also delivered and so can be ignored as per the client requirements."
+      description: >
+        Get list of coinjoins taken part in as maker (across all wallets).
+        Data returned as list of strings, each one in the same comma separated format as found in yigen-statement.csv.
+        Note that this returns all lines in the file, including the lines that are only present to represent the starting of a bot. Those lines contain the word Connected and can be thus discarded.
+        The header line is also delivered and so can be ignored as per the client requirements.
       responses:
         '200':
-          $ref: "#/components/responses/YieldGenReport-200-OK"
+          $ref: '#/components/responses/YieldGenReport-200-OK'
         '404':
           $ref: '#/components/responses/404-NotFound'
   /wallet/{walletname}/address/new/{mixdepth}:
@@ -164,11 +208,36 @@ paths:
             type: string
       responses:
         '200':
-          $ref: "#/components/responses/GetAddress-200-OK"
+          $ref: '#/components/responses/GetAddress-200-OK'
         '400':
           $ref: '#/components/responses/400-BadRequest'
-        '401':
-          $ref: '#/components/responses/401-Unauthorized'
+        '404':
+          $ref: '#/components/responses/404-NotFound'
+  /wallet/{walletname}/rescanblockchain/{blockheight}:
+    get:
+      security:
+        - bearerAuth: []
+      summary: Rescan the blockchain from a given blockheight
+      operationId: rescanblockchain
+      description: Use this operation on recovered wallets to re-sync the wallet
+      parameters:
+        - name: walletname
+          in: path
+          description: name of wallet including .jmdat
+          required: true
+          schema:
+            type: string
+        - name: blockheight
+          in: path
+          description: starting block height for the rescan
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          $ref: '#/components/responses/RescanBlockchain-200-OK'
+        '400':
+          $ref: '#/components/responses/400-BadRequest'
         '404':
           $ref: '#/components/responses/404-NotFound'
   /wallet/{walletname}/address/timelock/new/{lockdate}:
@@ -195,11 +264,9 @@ paths:
             example: "2021-09"
       responses:
         '200':
-          $ref: "#/components/responses/GetAddress-200-OK"
+          $ref: '#/components/responses/GetAddress-200-OK'
         '400':
           $ref: '#/components/responses/400-BadRequest'
-        '401':
-          $ref: '#/components/responses/401-Unauthorized'
         '404':
           $ref: '#/components/responses/404-NotFound'
   /wallet/{walletname}/utxos:
@@ -219,11 +286,9 @@ paths:
             example: "2021-09"
       responses:
         '200':
-          $ref: "#/components/responses/ListUtxos-200-OK"
+          $ref: '#/components/responses/ListUtxos-200-OK'
         '400':
           $ref: '#/components/responses/400-BadRequest'
-        '401':
-          $ref: '#/components/responses/401-Unauthorized'
         '404':
           $ref: '#/components/responses/404-NotFound'
   /wallet/{walletname}/taker/direct-send:
@@ -248,11 +313,9 @@ paths:
         description: transaction creation parameters
       responses:
         '200':
-          $ref: "#/components/responses/DirectSend-200-Accepted"
+          $ref: '#/components/responses/DirectSend-200-Accepted'
         '400':
           $ref: '#/components/responses/400-BadRequest'
-        '401':
-          $ref: '#/components/responses/401-Unauthorized'
         '404':
           $ref: '#/components/responses/404-NotFound'
         '409':
@@ -281,7 +344,7 @@ paths:
       responses:
         # note we use a default response, no data returned:
         '202':
-          $ref: "#/components/responses/202-Accepted"
+          $ref: '#/components/responses/202-Accepted'
         '400':
           $ref: '#/components/responses/400-BadRequest'
         '401':
@@ -308,7 +371,7 @@ paths:
             type: string
       responses:
         '202':
-          $ref: "#/components/responses/202-Accepted"
+          $ref: '#/components/responses/202-Accepted'
         '400':
           $ref: '#/components/responses/400-BadRequest'
         '401':
@@ -337,7 +400,7 @@ paths:
         description: taker side coinjoin parameters
       responses:
         '202':
-          $ref: "#/components/responses/202-Accepted"
+          $ref: '#/components/responses/202-Accepted'
         '400':
           $ref: '#/components/responses/400-BadRequest'
         '401':
@@ -370,7 +433,7 @@ paths:
         description: taker side schedule parameters
       responses:
         '202':
-          $ref: "#/components/responses/RunSchedule-202-OK"
+          $ref: '#/components/responses/RunSchedule-202-OK'
         '400':
           $ref: '#/components/responses/400-BadRequest'
         '401':
@@ -396,11 +459,9 @@ paths:
             type: string
       responses:
         '200':
-          $ref: "#/components/responses/GetSchedule-200-OK"
+          $ref: '#/components/responses/GetSchedule-200-OK'
         '400':
           $ref: '#/components/responses/400-BadRequest'
-        '401':
-          $ref: "#/components/responses/401-Unauthorized"
         '404':
           $ref: '#/components/responses/404-NotFound'
   /wallet/{walletname}/taker/stop:
@@ -419,7 +480,7 @@ paths:
             type: string
       responses:
         '202':
-          $ref: "#/components/responses/202-Accepted"
+          $ref: '#/components/responses/202-Accepted'
         '400':
           $ref: '#/components/responses/400-BadRequest'
         '401':
@@ -448,11 +509,9 @@ paths:
         description: config editing parameters
       responses:
         '200':
-          $ref: "#/components/responses/ConfigSet-200-OK"
+          $ref: '#/components/responses/ConfigSet-200-OK'
         '400':
           $ref: '#/components/responses/400-BadRequest'
-        '401':
-          $ref: '#/components/responses/401-Unauthorized'
         '409':
           $ref: '#/components/responses/409-NoConfig'
   /wallet/{walletname}/configget:
@@ -476,11 +535,9 @@ paths:
               $ref: '#/components/schemas/ConfigGetRequest'
       responses:
         '200':
-          $ref: "#/components/responses/ConfigGet-200-OK"
+          $ref: '#/components/responses/ConfigGet-200-OK'
         '400':
           $ref: '#/components/responses/400-BadRequest'
-        '401':
-          $ref: "#/components/responses/401-Unauthorized"
         '409':
           $ref: '#/components/responses/409-NoConfig'
   /wallet/{walletname}/freeze:
@@ -505,7 +562,7 @@ paths:
         description: utxo string and freeze toggle as boolean
       responses:
         '200':
-          $ref: "#/components/responses/Freeze-200-OK"
+          $ref: '#/components/responses/Freeze-200-OK'
         '400':
           $ref: '#/components/responses/400-BadRequest'
   /wallet/{walletname}/getseed:
@@ -522,18 +579,11 @@ paths:
           required: true
           schema:
             type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/GetSeedResponse'
       responses:
         '200':
-          $ref: "#/components/responses/GetSeed-200-OK"
+          $ref: '#/components/responses/GetSeed-200-OK'
         '400':
           $ref: '#/components/responses/400-BadRequest'
-        '401':
-          $ref: "#/components/responses/401-Unauthorized"
 components:
   securitySchemes:
     bearerAuth:
@@ -605,6 +655,35 @@ components:
         destination:
           type: string
           example: "bcrt1qujp2x2fv437493sm25gfjycns7d39exjnpptzw"
+    TokenRequest:
+      type: object
+      required:
+        - grant_type
+        - refresh_token
+      properties:
+        grant_type:
+          type: string
+        refresh_token:
+          type: string
+    TokenResponse:
+      type: object
+      required:
+        - token
+        - token_type
+        - expires_in
+        - scope
+        - refresh_token
+      properties:
+        token:
+          type: string
+        token_type:
+          type: string
+        expires_in:
+          type: integer
+        scope:
+          type: string
+        refresh_token:
+          type: string
     RunScheduleRequest:
       type: object
       required:
@@ -707,6 +786,22 @@ components:
       items:
         type: string
         example: "2021/10/26 16:40:21,133986791,1,200000000,2680,2680,0.08,"
+    GetinfoResponse:
+      type: object
+      required:
+        - version
+      properties:
+        version:
+          type: string
+          example: "0.9.10"
+    RescanBlockchainResponse:
+      type: object
+      required:
+        - walletname
+      properties:
+        walletname:
+          type: string
+          example: "wallet.jmdat"
     SessionResponse:
       type: object
       required:
@@ -714,6 +809,7 @@ components:
         - maker_running
         - coinjoin_in_process
         - wallet_name
+        - rescanning
       properties:
         session:
           type: boolean
@@ -721,9 +817,40 @@ components:
           type: boolean
         coinjoin_in_process:
           type: boolean
+        schedule:
+          type: array
+          items:
+            type: array
+            items:
+              oneOf:
+                - type: string
+                - type: integer
         wallet_name:
           type: string
           example: wallet.jmdat
+        offer_list:
+          type: array
+          items:
+            type: object
+            properties:
+              oid:
+                type: integer
+              ordertype:
+                type: string
+              minsize:
+                type: integer
+              maxsize:
+                type: integer
+              txfee:
+                type: integer
+              cjfee:
+                type: string
+        nickname:
+          type: string
+        rescanning:
+          type: boolean
+        block_height:
+          type: integer
     ListUtxosResponse:
       type: object
       properties:
@@ -816,13 +943,31 @@ components:
                                 type: string
                               extradata:
                                 type: string
-
     CreateWalletResponse:
       type: object
       required:
         - walletname
-        - token
         - seedphrase
+        - token
+        - refresh_token
+      properties:
+        walletname:
+          type: string
+          example: wallet.jmdat
+        seedphrase:
+          type: string
+        token:
+          type: string
+          format: byte
+        refresh_token:
+          type: string
+          format: byte
+    UnlockWalletResponse:
+      type: object
+      required:
+        - walletname
+        - token
+        - refresh_token
       properties:
         walletname:
           type: string
@@ -830,18 +975,7 @@ components:
         token:
           type: string
           format: byte
-        seedphrase:
-          type: string
-    UnlockWalletResponse:
-      type: object
-      required:
-        - walletname
-        - token
-      properties:
-        walletname:
-          type: string
-          example: wallet.jmdat
-        token:
+        refresh_token:
           type: string
           format: byte
     DirectSendResponse:
@@ -899,9 +1033,11 @@ components:
         schedule:
           type: array
           items:
-            oneOf:
-              - type: string
-              - type: integer
+            type: array
+            items:
+              oneOf:
+                - type: string
+                - type: integer
     LockWalletResponse:
       type: object
       required:
@@ -931,6 +1067,27 @@ components:
         wallettype:
           type: string
           example: "sw-fb"
+    RecoverWalletRequest:
+      type: object
+      required:
+        - walletname
+        - password
+        - wallettype
+        - seedphrase
+      properties:
+        walletname:
+          type: string
+          example: wallet.jmdat
+        password:
+          type: string
+          format: password
+          example: hunter2
+        wallettype:
+          type: string
+          example: "sw-fb"
+        seedphrase:
+          type: string
+          example: "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about"
     UnlockWalletRequest:
       type: object
       required:
@@ -960,6 +1117,8 @@ components:
         type: object
         properties:
           message:
+            type: string
+          error_description:
             type: string
 
   responses:
@@ -1000,14 +1159,38 @@ components:
         application/json:
           schema:
             $ref: "#/components/schemas/ListWalletsResponse"
+    Token-200-OK:
+      description: "Access token obtained successfully"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/TokenResponse"
     Session-200-OK:
       description: "successful heartbeat response"
       content:
         application/json:
           schema:
             $ref: "#/components/schemas/SessionResponse"
+    Getinfo-200-OK:
+      description: "successful Joinmarket getinfo response"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/GetinfoResponse"
+    RescanBlockchain-200-OK:
+      description: "Blockchain rescan started successfully"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/RescanBlockchainResponse"
     Create-201-OK:
       description: "wallet created successfully"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/CreateWalletResponse"
+    Recover-201-OK:
+      description: "wallet recovered successfully"
       content:
         application/json:
           schema:

@@ -96,6 +96,12 @@ def main():
                 sweeping = True
             destaddr = args[2]
         mixdepth = options.mixdepth
+        if len(args) > 2 and btc.is_bip21_uri(args[2]):
+            parsed = btc.decode_bip21_uri(args[2])
+            if 'amount' in parsed:
+                parser.error("Specify amount as a separate argument or amount in BIP21 URI, not both.")
+                sys.exit(EXIT_ARGERROR)
+            destaddr = parsed['address']
         addr_valid, errormsg = validate_address(destaddr)
         command_to_burn = (is_burn_destination(destaddr) and sweeping and
             options.makercount == 0)
@@ -105,7 +111,7 @@ def main():
                 jmprint("The required options for burning coins are zero makers"
                     + " (-N 0), sweeping (amount = 0) and not using BIP78 Payjoin", "info")
             sys.exit(EXIT_ARGERROR)
-        if sweeping == False and amount < jm_single().DUST_THRESHOLD:
+        if sweeping == False and options.makercount > 0 and amount < jm_single().DUST_THRESHOLD:
             jmprint('ERROR: Amount ' + btc.amount_to_str(amount) +
                 ' is below dust threshold ' +
                 btc.amount_to_str(jm_single().DUST_THRESHOLD) + '.', "error")
@@ -244,8 +250,11 @@ def main():
 
     if options.makercount == 0 and not bip78url:
         tx = direct_send(wallet_service, amount, mixdepth, destaddr,
-                         options.answeryes, with_final_psbt=options.with_psbt,
-                         optin_rbf=options.rbf, custom_change_addr=custom_change)
+                         options.answeryes,
+                         with_final_psbt=options.with_psbt,
+                         optin_rbf=not options.no_rbf,
+                         custom_change_addr=custom_change,
+                         change_label=options.changelabel)
         if options.with_psbt:
             log.info("This PSBT is fully signed and can be sent externally for "
                      "broadcasting:")
@@ -357,7 +366,8 @@ def main():
                       order_chooser=chooseOrdersFunc,
                       max_cj_fee=maxcjfee,
                       callbacks=(filter_orders_callback, None, taker_finished),
-                      custom_change_address=custom_change)
+                      custom_change_address=custom_change,
+                      change_label=options.changelabel)
     clientfactory = JMClientProtocolFactory(taker)
 
     if jm_single().config.get("BLOCKCHAIN", "network") == "regtest":

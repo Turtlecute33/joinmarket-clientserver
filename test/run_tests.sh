@@ -126,7 +126,7 @@ parse_flags ()
                     echo "Invalid option $1"
                 fi
                 echo "
-Usage: "${0}" [options]
+Usage: ${0} [options]
 
 Options:
 
@@ -155,7 +155,7 @@ run_jm_tests ()
     btcuser="bitcoinrpc"
     btcpwd="123456abcdef"
     nirc="2"
-    if ! parse_flags ${@}; then
+    if ! parse_flags "${@}"; then
         return 1
     fi
 
@@ -165,18 +165,14 @@ run_jm_tests ()
     fi
 
     if [[ -z "${VIRTUAL_ENV}" ]]; then
-        echo "Source JM virtualenv before running tests:
+        echo "Source JM virtual environment before running tests:
 
         \`source ./jmvenv/bin/activate\`"
         return 1
     fi
-    jm_requirements="requirements/testing.txt"
     jm_source="${VIRTUAL_ENV}/.."
-    export PKG_CONFIG_PATH="${PKG_CONFIG_PATH}:${VIRTUAL_ENV}/lib/pkgconfig"
-    export LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${VIRTUAL_ENV}/lib"
-    export C_INCLUDE_PATH="${C_INCLUDE_PATH}:${VIRTUAL_ENV}/include"
 
-    pushd "${jm_source}"
+    pushd "${jm_source}" || return 1
     if [ ! -f 'miniircd.tar.gz' ] || ! sha256_verify 'ce3a4ddc777343645ccd06ca36233b5777e218ee89d887ef529ece86a917fc33' 'miniircd.tar.gz'; then
         http_get "https://github.com/JoinMarket-Org/miniircd/archive/master.tar.gz" "miniircd.tar.gz"
     fi
@@ -185,17 +181,13 @@ run_jm_tests ()
         mkdir -p miniircd
         tar -xzf miniircd.tar.gz -C ./miniircd --strip-components=1
     fi
-    if ! pip install -r "${jm_requirements}"; then
-        echo "Packages in '${jm_requirements}' could not be installed. Exiting."
-        return 1
-    fi
     if [[ ! -L ./joinmarket.cfg && -e ./joinmarket.cfg ]]; then
         mv ./joinmarket.cfg ./joinmarket.cfg.bak
 		echo "file 'joinmarket.cfg' moved to 'joinmarket.cfg.bak'"
     fi
     for dir in '/dev/shm' '/Volumes/ramdisk' '/tmp' "${jm_source}/test"; do
         if [[ -d "${dir}" && -r "${dir}" && -w "${dir}" && -x "${dir}" ]]; then
-            jm_test_datadir="${dir}/jm_test_home/.bitcoin"
+            jm_test_datadir="${dir}/jm_test_home-$(whoami)/.bitcoin"
             break
         fi
     done
@@ -217,18 +209,18 @@ run_jm_tests ()
     echo "datadir=${jm_test_datadir}" >> "${jm_test_datadir}/bitcoin.conf"
     python -m pytest $additional_pytest_flags \
         ${HAS_JOSH_K_SEAL_OF_APPROVAL+--cov=jmclient --cov=jmbitcoin --cov=jmbase --cov=jmdaemon --cov-report html} \
-        --btcconf=$btcconf \
-        --btcpwd=$btcpwd \
-        --btcroot=$btcroot \
-        --btcuser=$btcuser \
-        --nirc=$nirc \
+        --btcconf="$btcconf" \
+        --btcpwd="$btcpwd" \
+        --btcroot="$btcroot" \
+        --btcuser="$btcuser" \
+        --nirc="$nirc" \
         -p no:warnings
     local success="$?"
     [[ -f ./joinmarket.cfg ]] && unlink ./joinmarket.cfg
-    if [ -f "${jm_test_datadir}/bitcoind.pid" ] && read bitcoind_pid <"${jm_test_datadir}/bitcoind.pid"; then
-        kill -15 ${bitcoind_pid} || kill -9 ${bitcoind_pid}
+    if [ -f "${jm_test_datadir}/bitcoind.pid" ] && read -r bitcoind_pid < "${jm_test_datadir}/bitcoind.pid"; then
+        kill -15 "${bitcoind_pid}" || kill -9 "${bitcoind_pid}"
     fi
-    if [[ "${HAS_JOSH_K_SEAL_OF_APPROVAL}" == true ]] && (( ${success} != 0 )); then
+    if [[ "${HAS_JOSH_K_SEAL_OF_APPROVAL}" == true ]] && (( success != 0 )); then
         tail -100 "${jm_test_datadir}/regtest/debug.log"
         find "${jm_test_datadir}"
     else
@@ -236,4 +228,4 @@ run_jm_tests ()
     fi
     return ${success:-1}
 }
-run_jm_tests ${@}
+run_jm_tests "${@}"

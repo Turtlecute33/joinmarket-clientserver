@@ -1,6 +1,4 @@
 #!/usr/bin/env python3
-from future.utils import iteritems
-from past.builtins import cmp
 from functools import cmp_to_key
 
 import http.server
@@ -12,7 +10,7 @@ import time
 import hashlib
 import os
 import sys
-from future.moves.urllib.parse import parse_qs
+from urllib.parse import parse_qs
 from decimal import Decimal
 from optparse import OptionParser
 from twisted.internet import reactor
@@ -36,7 +34,7 @@ try:
     import matplotlib
 except:
     log.warning("matplotlib not found, charts will not be available. "
-                "Do `pip install matplotlib` in the joinmarket virtualenv.")
+                "Do `pip install matplotlib` in the joinmarket virtual environment.")
 
 if 'matplotlib' in sys.modules:
     # https://stackoverflow.com/questions/2801882/generating-a-png-with-matplotlib-when-display-is-undefined
@@ -210,11 +208,9 @@ class OrderbookPageRequestHeader(http.server.SimpleHTTPRequestHandler):
         with self.taker.dblock:
             rows = self.taker.db.execute('SELECT * FROM orderbook;').fetchall()
             fbonds = self.taker.db.execute("SELECT * FROM fidelitybonds;").fetchall()
-        if not rows or not fbonds:
-            return []
 
         fidelitybonds = []
-        if jm_single().bc_interface != None:
+        if fbonds and jm_single().bc_interface != None:
             (fidelity_bond_data, fidelity_bond_values, bond_outpoint_conf_times) =\
                 get_fidelity_bond_data(self.taker)
             fidelity_bond_values_dict = dict([(bond_data.maker_nick, bond_value)
@@ -551,12 +547,19 @@ class OrderbookPageRequestHeader(http.server.SimpleHTTPRequestHandler):
                               ('maxsize', satoshi_to_unit),
                               ('bondvalue', do_nothing))
 
-        # somewhat complex sorting to sort by cjfee but with swabsoffers on top
+        def _cmp(x, y):
+            if x < y:
+                return -1
+            elif x > y:
+                return 1
+            else:
+                return 0
 
+        # somewhat complex sorting to sort by cjfee but with swabsoffers on top
         def orderby_cmp(x, y):
             if x['ordertype'] == y['ordertype']:
-                return cmp(Decimal(x['cjfee']), Decimal(y['cjfee']))
-            return cmp(offername_list.index(x['ordertype']),
+                return _cmp(Decimal(x['cjfee']), Decimal(y['cjfee']))
+            return _cmp(offername_list.index(x['ordertype']),
                        offername_list.index(y['ordertype']))
 
         for o in sorted(rows, key=cmp_to_key(orderby_cmp)):
@@ -667,7 +670,7 @@ class OrderbookPageRequestHeader(http.server.SimpleHTTPRequestHandler):
             replacements = {}
             orderbook_fmt = json.dumps(self.create_orderbook_obj())
         orderbook_page = orderbook_fmt
-        for key, rep in iteritems(replacements):
+        for key, rep in replacements.items():
             orderbook_page = orderbook_page.replace(key, rep)
         self.send_response(200)
         if self.path.endswith('.json'):
@@ -684,6 +687,9 @@ class OrderbookPageRequestHeader(http.server.SimpleHTTPRequestHandler):
         if self.path not in pages:
             return
         if self.path == '/refreshorderbook':
+            with self.taker.dblock:
+                self.taker.db.execute("DELETE FROM orderbook;")
+                self.taker.db.execute("DELETE FROM fidelitybonds;")
             self.taker.msgchan.request_orderbook()
             time.sleep(5)
             self.path = '/'
@@ -768,7 +774,6 @@ def on_privmsg(inst, nick, message):
         except:
             pass
 
-        
 def get_dummy_nick():
     """In Joinmarket-CS nick creation is negotiated
     between client and server/daemon so as to allow

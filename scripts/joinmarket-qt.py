@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-from future.utils import iteritems
+from typing import Optional
 
 '''
 Joinmarket GUI using PyQt for doing coinjoins.
@@ -53,7 +53,7 @@ qt5reactor.install()
 donation_address_url = "https://bitcoinprivacy.me/joinmarket-donations"
 
 #Version of this Qt script specifically
-JM_GUI_VERSION = '29dev'
+JM_GUI_VERSION = '33dev'
 
 from jmbase import get_log, stop_reactor, set_custom_stop_reactor
 from jmbase.support import EXIT_FAILURE, utxo_to_utxostr,\
@@ -73,7 +73,8 @@ from jmclient import load_program_config, get_network, update_persist_config,\
     parse_payjoin_setup, send_payjoin, JMBIP78ReceiverManager, \
     detect_script_type, general_custom_change_warning, \
     nonwallet_custom_change_warning, sweep_custom_change_warning, EngineError,\
-    TYPE_P2WPKH, check_and_start_tor, is_extended_public_key
+    TYPE_P2WPKH, check_and_start_tor, is_extended_public_key, \
+    ScheduleGenerationErrorNoFunds, Storage
 from jmclient.wallet import BaseWallet
 
 from qtsupport import ScheduleWizard, TumbleRestartWizard, config_tips,\
@@ -110,7 +111,11 @@ log.addHandler(handler)
 
 
 from jmqtui import Ui_OpenWalletDialog
+
+
 class JMOpenWalletDialog(QDialog, Ui_OpenWalletDialog):
+    DEFAULT_WALLET_FILE_TEXT = "wallet.jmdat"
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.setupUi(self)
@@ -118,15 +123,35 @@ class JMOpenWalletDialog(QDialog, Ui_OpenWalletDialog):
 
         self.chooseWalletButton.clicked.connect(self.chooseWalletFile)
 
-    def chooseWalletFile(self):
-        wallets_path = os.path.join(jm_single().datadir, 'wallets')
-        (filename, _) = QFileDialog.getOpenFileName(self,
-                                                'Choose Wallet File',
-                                                wallets_path,
-                                                options=QFileDialog.DontUseNativeDialog)
+    def chooseWalletFile(self, error_text: str = ""):
+        (filename, _) = QFileDialog.getOpenFileName(
+            self,
+            "Choose Wallet File",
+            self._get_wallets_path(),
+            options=QFileDialog.DontUseNativeDialog,
+        )
         if filename:
             self.walletFileEdit.setText(filename)
             self.passphraseEdit.setFocus()
+            self.errorMessageLabel.setText(self.verify_lock(filename))
+
+    @staticmethod
+    def _get_wallets_path() -> str:
+        """Return wallets path"""
+        return os.path.join(jm_single().datadir, "wallets")
+
+    @classmethod
+    def verify_lock(cls, filename: Optional[str] = None) -> str:
+        """Return an error text if wallet is locked, empty string otherwise"""
+        if filename is None:
+            filename = os.path.join(
+                cls._get_wallets_path(), cls.DEFAULT_WALLET_FILE_TEXT
+            )
+        try:
+            Storage.verify_lock(filename)
+            return ""
+        except Exception as e:
+            return str(e)
 
 
 class HelpLabel(QLabel):
@@ -413,8 +438,15 @@ class SpendTab(QWidget):
         wizard_return = wizard.exec_()
         if wizard_return == QDialog.Rejected:
             return
-        self.spendstate.loaded_schedule = wizard.get_schedule(
-            mainWindow.wallet_service.get_balance_by_mixdepth())
+        try:
+            self.spendstate.loaded_schedule = wizard.get_schedule(
+            mainWindow.wallet_service.get_balance_by_mixdepth(),
+            mainWindow.wallet_service.mixdepth)
+        except ScheduleGenerationErrorNoFunds:
+            JMQtMessageBox(self,
+                           "Failed to start tumbler; no funds available.",
+                           title="Tumbler start failed.")
+            return
         self.spendstate.schedule_name = wizard.get_name()
         self.updateSchedView()
         self.tumbler_options = wizard.opts
@@ -826,7 +858,7 @@ class SpendTab(QWidget):
 
         # for coinjoin sends no point to send below dust threshold, likely
         # there will be no makers for such amount.
-        if amount != 0 and not self.checkAmount(amount):
+        if amount != 0 and makercount > 0 and not self.checkAmount(amount):
             return
 
         if makercount < jm_single().config.getint(
@@ -960,7 +992,7 @@ class SpendTab(QWidget):
         mbinfo.append(" ")
         mbinfo.append("Counterparties chosen:")
         mbinfo.append('Name,     Order id, Coinjoin fee (sat.)')
-        for k, o in iteritems(offers):
+        for k, o in offers.items():
             if o['ordertype'] in ['sw0reloffer', 'swreloffer', 'reloffer']:
                 display_fee = int(self.taker.cjamount *
                                   float(o['cjfee'])) - int(o['txfee'])
@@ -1983,13 +2015,14 @@ class JMMainWindow(QMainWindow):
 
     def openWallet(self):
         wallet_loaded = False
-        wallet_file_text = "wallet.jmdat"
         error_text = ""
 
         while not wallet_loaded:
             openWalletDialog = JMOpenWalletDialog()
-            openWalletDialog.walletFileEdit.setText(wallet_file_text)
-            openWalletDialog.errorMessageLabel.setText(error_text)
+            # Set default wallet file name and verify its lock status
+            openWalletDialog.walletFileEdit.setText(openWalletDialog.DEFAULT_WALLET_FILE_TEXT)
+            openWalletDialog.errorMessageLabel.setText(openWalletDialog.verify_lock())
+
             if openWalletDialog.exec_() == QDialog.Accepted:
                 wallet_file_text = openWalletDialog.walletFileEdit.text()
                 wallet_path = wallet_file_text

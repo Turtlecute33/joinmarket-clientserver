@@ -34,6 +34,8 @@ Download the latest [release](https://github.com/Joinmarket-Org/joinmarket-clien
 
 Make sure to validate the signature on the tar/zip file provided with the [release](https://github.com/Joinmarket-Org/joinmarket-clientserver/releases) (or check the signature in git if you install that way using `git log --show-signature`).
 
+JoinMarket requires Python 3.7 or newer installed.
+
 (**macOS users**: Make sure that you have Homebrew and Apple's Command Line Tools installed.)
 
     ./install.sh
@@ -47,8 +49,6 @@ Follow instructions on screen; provide sudo password when prompted, then when fi
 
 You can optionally install a Qt GUI application, you will be prompted to choose this during installation.
 
-Do note, Python 2 is no longer supported as it has reached its end of life.
-
 You should now be able to run the scripts like `python wallet-tool.py` etc., just as you did in the previous Joinmarket version.
 
 Alternative to this "quickstart": follow the [install guide](docs/INSTALL.md).
@@ -58,7 +58,7 @@ Alternative to this "quickstart": follow the [install guide](docs/INSTALL.md).
 * [Installation on Windows](docs/INSTALL.md#installation-on-windows).
 * [Installation with Docker](docs/INSTALL.md#docker-installation)
 * [Installation guide for RaspiBlitz](https://github.com/openoms/bitcoin-tutorials/blob/master/joinmarket/README.md).
-* [Installation guide for RaspiBolt](https://github.com/kristapsk/raspibolt-extras/blob/master/joinmarket.md).
+* [Installation guide for RaspiBolt](https://raspibolt.org/guide/bonus/bitcoin/joinmarket.html).
 * [Installation guide for Qubes+Whonix](https://github.com/qubenix/qubes-whonix-bitcoin/blob/master/1_joinmarket.md).
 * [Youtube video installation tutorial for Ubuntu](https://www.youtube.com/watch?v=zTCC86IUzWo).
 
@@ -70,8 +70,15 @@ If you are running Joinmarket-Qt, you can instead use the [walkthrough](docs/JOI
 
 If you used the old version of Joinmarket, the notes in the [scripts readme](scripts/README.md) help to understand what has and hasn't changed about the scripts (warning: this refers to changes from several years ago, so may be slightly outdated).
 
-If you are looking for the available makers, run the [orderbook](docs/orderbook.md). 
-Public mainnet mirror: [JoinMarket Browser Interface Orderbook](https://nixbitcoin.org/orderbook) [(🧅 tor)](http://qvzlxbjvyrhvsuyzz5t63xx7x336dowdvt7wfj53sisuun4i4rdtbzid.onion/orderbook)
+If you are looking for the available makers, run the [orderbook](docs/orderbook.md). It's recommended to run your own orderbook locally, but there are also public mirrors:
+* https://nixbitcoin.org/orderbook (clearnet) / http://qvzlxbjvyrhvsuyzz5t63xx7x336dowdvt7wfj53sisuun4i4rdtbzid.onion/orderbook (Tor)
+* http://nnuifroxn5aolsqa2svedcskojlqfp2ygt4u42ac7njehsbemagpwiqd.onion (Tor)
+
+### Useful third-party projects
+
+* [***JoininBox***](https://github.com/openoms/joininbox). A minimalistic, security focused linux environment for JoinMarket with a terminal based graphical menu. Good for setting up on a dedicated machine or raspberry pi: https://github.com/openoms/joininbox
+
+* [***JAM***](https://github.com/joinmarket-webui/joinmarket-webui). Jam is a web UI for JoinMarket with focus on user-friendliness. It aims to provide sensible defaults and be easy to use for beginners while still providing the features advanced users expect: https://github.com/joinmarket-webui/joinmarket-webui
 
 ### PayJoin
 
@@ -86,7 +93,7 @@ If binaries are built, they will be gpg signed and announced on the Releases pag
 If you haven't chosen the Qt option during installation with `install.sh`, then to run the script `joinmarket-qt.py` from the command line you will need to install two more packages.  Use these 2 commands while the `jmvenv` virtual environment is activated:
 
 ```
-pip install -r requirements/gui.txt
+pip install .[gui]
 ```
 After this, the command `python joinmarket-qt.py` from within the `scripts` subdirectory should work.
 There is a [walkthrough](docs/JOINMARKET-QT-GUIDE.md) for what to do next.

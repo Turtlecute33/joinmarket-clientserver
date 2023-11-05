@@ -174,7 +174,7 @@ Before you do such coinjoins, you may want to:
 
 ```
 [PAYJOIN]
-# for the majority of situations, the defaults
+# For the majority of situations, the defaults
 # need not be altered - they will ensure you don't pay
 # a significantly higher fee.
 # MODIFICATION OF THESE SETTINGS IS DISADVISED.
@@ -182,7 +182,7 @@ Before you do such coinjoins, you may want to:
 # Payjoin protocol version; currently only '1' is supported.
 payjoin_version = 1
 
-# servers can change their destination address by default (0).
+# Servers can change their destination address by default (0).
 # if '1', they cannot. Note that servers can explicitly request
 # that this is activated, in which case we respect that choice.
 disable_output_substitution = 0
@@ -198,19 +198,30 @@ disable_output_substitution = 0
 # to that of our change output, unless there is none in which case this is disabled.
 max_additional_fee_contribution = default
 
-# this is the minimum satoshis per vbyte we allow in the payjoin
+# This is the minimum sats/vbyte we allow in the payjoin
 # transaction; note it is decimal, not integer.
 min_fee_rate = 1.1
 
-# for payjoin onion service creation, the tor control configuration:
-tor_control_host = localhost
-# or, to use a UNIX socket
-# control_host = unix:/var/run/tor/control
-tor_control_port = 9051
-
-# for payjoins to hidden service endpoints, the socks5 configuration:
+# For payjoins as sender (i.e. client) to hidden service endpoints,
+# the socks5 configuration:
 onion_socks5_host = localhost
 onion_socks5_port = 9050
+
+# For payjoin onion service creation:
+# the tor control configuration:
+tor_control_host = localhost
+
+# or, to use a UNIX socket
+# control_host = unix:/var/run/tor/control
+# note: port needs to be provided (but is ignored for UNIX socket)
+tor_control_port = 9051
+
+# the host/port actually serving the hidden service
+# (note the *virtual port*, that the client uses,
+# is hardcoded to 80):
+onion_serving_host = 127.0.0.1
+onion_serving_port = 8082
+
 # in some exceptional case the HS may be SSL configured,
 # this feature is not yet implemented in code, but here for the
 # future:
@@ -227,7 +238,7 @@ bump the fee enough to add one input to the transaction, and this should be fine
 
 #### Using Joinmarket-wallet-to-Joinmarket-wallet payjoins
 
-This is now deprecated; if you still want to use it, use Joinmarket(-clientserver) version 0.7.0 or lower, and see the corresponding older version of this document.
+This can be done with the same [BIP78](https://github.com/bitcoin/bips/blob/master/bip-0078.mediawiki) workflow described above; the "old style" internal Joinmarket payjoins from 2019 are now deprecated.
 
 <a name="fees" />
 
@@ -329,50 +340,9 @@ it means of course the other case. Double check with your counterparty, somethin
 
 <a name="torconfig" />
 
-#### Configuring Tor to setup a hidden service
+#### Configuring Tor to setup an onion service
 
-(These steps were prepared using Ubuntu; you may have to adjust for your distro).
-
-First, ensure you have Tor installed:
-
-```
-sudo apt install tor
-```
-
-Don't start the tor daemon yet though, since we need to do some setup. Edit Tor's config file with sudo:
-
-```
-sudo vim /etc/tor/torrc
-```
-
-and uncomment these two lines to enable hidden service startup:
-
-```
-ControlPort 9051
-CookieAuthentication 1
-```
-
-However if you proceed at this point to try to run `receive-payjoin.py` as outlined above, you will almost certainly get an error like this:
-
-```
-Permission denied: '/var/run/tor/control.authcookie'
-```
-
-... because reading this file requires being a member of the group `debian-tor`. So add your user to this group:
-
-```
-sudo usermod -a -G debian-tor yourusername
-```
-
-... and then you must *restart the computer/server* for that change to take effect (check it with `groups yourusername`).
-
-Finally, after system restart, ensure Tor is started (it may be automatically, but anyway):
-
-```
-sudo service tor start
-```
-
- Once this is done, you should be able to run the BIP 78 receiver script, or [JoinmarketQt](#using-qt) and a hidden service will be automatically created for you from now on.
+Read about how to do this [here](./tor.md).
 
 <a name="using-qt" />
 
